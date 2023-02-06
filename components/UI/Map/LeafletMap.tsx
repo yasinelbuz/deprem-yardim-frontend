@@ -1,54 +1,82 @@
-import React from "react";
 import Map from "@/components/UI/Map/Map";
-import "leaflet/dist/leaflet.css";
+import { MarkerData } from "@/mocks/types";
+import { HeatmapLayerFactory } from "@vgrid/react-leaflet-heatmap-layer";
+import { LeafletMouseEvent, SpiderfyEventHandlerFn } from "leaflet";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
-
+import "leaflet/dist/leaflet.css";
 import dynamic from "next/dynamic";
-import { DEFAULT_CENTER, DEFAULT_ZOOM } from "./utils";
-import { MarkerData } from "../../../mocks/types";
+import { Fragment } from "react";
+import { Marker, MarkerProps, TileLayer } from "react-leaflet";
+import { DEFAULT_CENTER, DEFAULT_IMPORTANCY, DEFAULT_ZOOM } from "./utils";
+const HeatmapLayer = HeatmapLayerFactory<[number, number, number]>();
 
 const MarkerClusterGroup = dynamic(() => import("./MarkerClusterGroup"), {
   ssr: false,
 });
 
+const MapLegend = dynamic(() => import("./MapLegend"), {
+  ssr: false,
+});
+
 type Props = {
   data: MarkerData[];
-  onClickMarker: (
-    // eslint-disable-next-line no-unused-vars
-    e: React.KeyboardEvent | React.MouseEvent,
-    // eslint-disable-next-line no-unused-vars
-    markerData: MarkerData
-  ) => void;
+  onClickMarker: (_e: LeafletMouseEvent, _markerData: MarkerData) => void;
+  onClusterClick: SpiderfyEventHandlerFn;
 };
 
-function LeafletMap({ onClickMarker, data }: Props) {
+type ExtendedMarkerProps = MarkerProps & {
+  markerData: MarkerData;
+};
+
+function ExtendedMarker({ ...props }: ExtendedMarkerProps) {
+  return <Marker {...props} />;
+}
+
+function LeafletMap({ onClickMarker, data, onClusterClick }: Props) {
   return (
-    <Map center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM}>
-      {({ TileLayer, Marker }: any) => (
-        <>
-          <TileLayer
-            url={`http://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}&apistyle=s.e%3Al.i%7Cp.v%3Aoff%2Cs.t%3A3%7Cs.e%3Ag%7C`}
-          />
-          <MarkerClusterGroup>
-            {data.map((marker: MarkerData) => (
-              <Marker
+    <>
+      <MapLegend />
+      <Map center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM}>
+        <TileLayer
+          url={`https://mt0.google.com/vt/lyrs=m&hl=en&x={x}&y={y}&z={z}&apistyle=s.e%3Al.i%7Cp.v%3Aoff%2Cs.t%3A3%7Cs.e%3Ag%7C`}
+        />
+        <MarkerClusterGroup eventHandlers={{ spiderfied: onClusterClick }}>
+          {data.map((marker: MarkerData) => (
+            <Fragment key={marker.place_id}>
+              <ExtendedMarker
                 key={marker.place_id}
                 position={[
                   marker.geometry.location.lat,
                   marker.geometry.location.lng,
                 ]}
                 eventHandlers={{
-                  click: (e: any) => {
+                  click: (e) => {
                     onClickMarker(e, marker);
                   },
                 }}
+                markerData={marker}
               />
-            ))}
-          </MarkerClusterGroup>
-        </>
-      )}
-    </Map>
+              <HeatmapLayer
+                fitBoundsOnLoad
+                fitBoundsOnUpdate
+                radius={15}
+                points={[
+                  [
+                    marker.geometry.location.lat,
+                    marker.geometry.location.lng,
+                    DEFAULT_IMPORTANCY,
+                  ],
+                ]}
+                longitudeExtractor={(m: any) => m[1]}
+                latitudeExtractor={(m: any) => m[0]}
+                intensityExtractor={(m: any) => m[2]}
+              />
+            </Fragment>
+          ))}
+        </MarkerClusterGroup>
+      </Map>
+    </>
   );
 }
 

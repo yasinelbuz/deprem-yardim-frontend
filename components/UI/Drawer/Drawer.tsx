@@ -9,23 +9,22 @@ import CloseIcon from "@mui/icons-material/Close";
 import { useWindowSize } from "@/hooks/useWindowsSize";
 import { IconButton, InputAdornment, Snackbar, TextField } from "@mui/material";
 import FileCopyIcon from "@mui/icons-material/FileCopy";
+import { KeyboardEvent, MouseEvent } from "react";
+import { useDrawerData, useIsDrawerOpen } from "@/stores/mapStore";
 
-export default function Drawer({
-  isOpen,
-  toggler,
-  data,
-}: {
-  isOpen: boolean;
-  // eslint-disable-next-line no-unused-vars
-  toggler: (e: any) => void;
-  data: any;
-}) {
+interface DrawerProps {
+  toggler: (_e: KeyboardEvent | MouseEvent) => void;
+}
+
+function generateGoogleMapsUrl(lat: number, lng: number): string {
+  return `https://www.google.com/maps/@${lat},${lng},22z`;
+}
+
+export default function Drawer({ toggler }: DrawerProps) {
+  const isOpen = useIsDrawerOpen();
+  const data = useDrawerData();
   const size = useWindowSize();
   const [openBillboardSnackbar, setOpenBillboardSnackbar] = useState(false);
-
-  function openGoogleMap(lat: string, lng: string) {
-    window.open(`https://www.google.com/maps/@${lat},${lng},22z`, "_blank");
-  }
 
   function copyBillboard(url: string) {
     navigator.clipboard.writeText(url);
@@ -33,6 +32,9 @@ export default function Drawer({
   }
 
   const list = useMemo(() => {
+    if (!data) {
+      return null;
+    }
     const { geometry, formatted_address } = data;
     return (
       <Box
@@ -42,8 +44,7 @@ export default function Drawer({
           flexDirection: "column",
         }}
         role="presentation"
-        onClick={(e: any) => toggler(e)}
-        onKeyDown={(e: any) => toggler(e)}
+        onKeyDown={(e) => toggler(e)}
       >
         <div className={styles.content}>
           <Tag color={Tags["mid"]?.color}>{Tags["mid"]?.intensity}</Tag>
@@ -53,28 +54,36 @@ export default function Drawer({
             <Button
               variant="contained"
               onClick={() =>
-                openGoogleMap(
-                  geometry.location.lat.toString(),
-                  geometry.location.lng.toString()
+                window.open(
+                  generateGoogleMapsUrl(
+                    geometry.location.lat,
+                    geometry.location.lng
+                  ),
+                  "_blank"
                 )
               }
             >
               Google Haritalar ile gör
             </Button>
           </div>
-
           <div>
             <TextField
               fullWidth
               variant="standard"
-              value={`https://www.google.com/maps/@${data?.lat},${data?.lng},14z`}
+              value={generateGoogleMapsUrl(
+                geometry.location.lat,
+                geometry.location.lng
+              )}
               InputProps={{
                 endAdornment: (
                   <InputAdornment position="start">
                     <IconButton
                       onClick={() =>
                         copyBillboard(
-                          `https://www.google.com/maps/@${data?.lat},${data?.lng},14z`
+                          generateGoogleMapsUrl(
+                            geometry.location.lat,
+                            geometry.location.lng
+                          )
                         )
                       }
                     >
@@ -87,7 +96,7 @@ export default function Drawer({
             />
           </div>
         </div>
-        <CloseIcon className={styles.closeButton} />
+        <CloseIcon onClick={(e) => toggler(e)} className={styles.closeButton} />
       </Box>
     );
   }, [data, size.width, toggler]);
@@ -100,12 +109,11 @@ export default function Drawer({
         onClose={() => setOpenBillboardSnackbar(false)}
         message="Adres Kopyalandı"
       />
-      <Button onClick={(e: any) => toggler(e)}>Left</Button>
       <MuiDrawer
         className="drawer"
         anchor={size.width > 768 ? "left" : "bottom"}
         open={isOpen}
-        onClose={(e: any) => toggler(e)}
+        onClose={(e) => toggler(e as MouseEvent)}
       >
         {list}
       </MuiDrawer>
